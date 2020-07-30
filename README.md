@@ -15,3 +15,4 @@
 
 ##### Problem 7 - Locating Restriction sites. Finding reverse palindrome by checking if the DNA string is equal to its reverse complement. A palindrome can occur in lengths of 4 and 12 and can occur in multiple positions. 
 
+##### Problem 8 - Rabbits and Recurrence Relations. Using a recursive program and Fibonacci sequence.
