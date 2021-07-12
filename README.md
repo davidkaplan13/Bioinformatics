@@ -2,7 +2,7 @@
 
 ### AJUBA and USP7 work
 > Clustering mRNA: R code, R markdown and associated PDF file with results
-
+> Heatmap: R code, R markdown and associated PDF file
 
 
 
