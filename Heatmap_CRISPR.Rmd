@@ -1,0 +1,66 @@
+---
+title: "HeatmapR"
+author: "David Kaplan"
+date: "12/07/2021"
+output: pdf_document
+---
+
+```{r}
+setwd('/Users/davidkaplan/Desktop/Ewing/Ahood')
+
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(ggplot2)
+library(RColorBrewer)
+library(reshape)
+library(plotly)
+library(cluster)
+library(NbClust)
+library(factoextra)
+library(dendextend)
+library(gsubfn)
+```
+
+Loading datasets
+```{r}
+CRISPR_gene_effect <- read.csv('CRISPR_gene_effect.csv')
+AJUBA <- read.csv('Ajuba_to_colorectal.csv')
+```
+Filter top 50 gene names (Gets rid of values)
+```{r}
+AJUBA_top <- AJUBA[1:50,-2]
+AJUBA_top <- as.data.frame(AJUBA_top)
+```
+Filter only for colorectal cancer cell lines
+```{r}
+sample_info <- read.csv('sample_info.csv')
+target_disease <- filter(
+  .data=sample_info,
+  primary_disease == 'Colon/Colorectal Cancer'
+)
+
+DepMapID <- CRISPR_gene_effect %>%
+  filter(DepMap_ID %in% target_disease$DepMap_ID)
+```
+Filter for only the top 50 genes associated with AJUBA
+```{r}
+Genes <- DepMapID[,which((names(DepMapID) %in% AJUBA_top$AJUBA_top)==TRUE)]
+```
+Add Cell lines as index
+```{r}
+rownames(Genes) <- DepMapID$DepMap_ID
+```
+Transpose data
+```{r}
+gene_t <- t(Genes)
+gene_t[,0]
+data_melt <- melt(gene_t)
+```
+Plot heatmap
+```{r}
+my_matrix <- as.matrix(gene_t)
+# coul <- colorRampPalette(brewer.pal(8, "PiYG"))(25)
+heatmap(my_matrix)
+```
+
