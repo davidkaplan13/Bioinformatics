@@ -1,0 +1,54 @@
+---
+title: "Clustering mRNA"
+author: "David Kaplan"
+date: "12/07/2021"
+output: html_document
+---
+
+```{r}
+setwd('/Users/davidkaplan/Desktop/Ewing/Ahood')
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(cluster)
+library(NbClust)
+library(factoextra)
+library(dendextend)
+```
+
+Loading dataset files
+```{r}
+mRNA <- read.csv('CCLE_expression.csv')
+sample_info <- read.csv('sample_info.csv')
+```
+
+Filtering sample_info to only retrieve DepMap_ID of colorectal cancer lineages
+
+```{r}
+target_diseases <- filter(
+  .data=sample_info,
+  primary_disease == 'Colon/Colorectal Cancer'
+)
+
+```
+Applying the filter in the CCLE expression dataset
+```{r}
+mRNA_colon <- mRNA %>%
+  filter(X %in% target_diseases$DepMap_ID)
+transformed_mRNA <- mRNA_colon[,names(mRNA_colon)]
+rownames(transformed_mRNA) <- transformed_mRNA$X
+transformed_mRNA <- transformed_mRNA[,-1]
+```
+
+Running through hierarchical clustering, cutting the data into 70 clusters.
+```{r}
+transformed_mRNA <- t(transformed_mRNA)
+distancemRNA <- dist(transformed_mRNA,method='maximum')
+clustermRNA <- hclust(distancemRNA, method='ward.D')
+clustermRNAs = cutree(clustermRNA,k=70)
+clustermRNAs <- as.data.frame(clustermRNAs)
+
+clustermRNAs <- cbind(gene = rownames(clustermRNAs), clustermRNAs)
+clustermRNAs$gene <- sub("\\..*","",clustermRNAs$gene)
+```
+
