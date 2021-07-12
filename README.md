@@ -1,4 +1,12 @@
 ## Bioinformatics
+
+### AJUBA and USP7 work
+> Clustering mRNA: R code, R markdown and associated PDF file with results
+
+
+
+
+
 ### Solution to ROSALIND Bioinformatics Problems
 
 ##### Problem 1 - Reverse Compliment of DNA strand
