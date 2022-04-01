@@ -1,0 +1,305 @@
+---
+title: "AllCancerAnalysis"
+author: "David Kaplan"
+date: "01/04/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(tibble)
+library(tidyr)
+library(psych)
+library(devtools)
+library(ComplexHeatmap)
+library(data.table)
+library(NbClust)
+library(dendextend)
+library(factoextra)
+library(cluster)
+library(qgraph)
+setwd('/Users/davidkaplan/Desktop/Year\ 3/Diss/Programming/Code')
+CRISPR <- read.csv('CRISPR_gene_effect.csv')
+sample_info <- read.csv('sample_info.csv')
+```
+
+```{r}
+names(CRISPR) <- gsub("[[:punct:]]", "_", names(CRISPR))
+names(CRISPR) <- sub('_.*', '', names(CRISPR))
+```
+
+```{r}
+CRISPR_TP53 <- as.data.frame(cor(CRISPR[,2:ncol(CRISPR)],CRISPR[['TP53']]))
+CRISPR_TP53 <- rownames_to_column(CRISPR_TP53,var='Gene')
+```
+
+```{r}
+corr <- CRISPR_TP53[order(-abs(CRISPR_TP53$V1)),]
+#corr <- rbind.data.frame(c("USP7",1), corr)
+corr$target <- 'TP53'
+corr <- corr[,c(1,3,2)]
+corr$V1 <- as.numeric(corr$V1)
+corr$V1 <- format(round(corr$V1, 2), nsmall = 3)
+```
+
+```{r}
+corr <- corr[! (corr$Gene == 'KRTAP19.6'),]
+corr <- corr[1:40,]
+corr <- na.omit(corr)
+vec <- as.vector(corr$Gene)
+xy <- as.data.frame(vec)
+TP53_mat <- CRISPR[,which((names(CRISPR) %in% vec)==TRUE)]
+
+rownames(TP53_mat) <- CRISPR$DepMap
+TP53_mat <- as.matrix(TP53_mat)
+TP53_mat <- t(TP53_mat)
+```
+
+```{r}
+d <- dist(t(TP53_mat), method = "euclidean")
+hc1 <- hclust(d, method = "complete" )
+
+plot(hc1, cex = 0.05, hang = -1)
+
+rect.hclust(hc1, k = 4, border = 2:5)
+```
+
+
+```{r}
+row_ha = rowAnnotation(genes = anno_text(corr$Gene, gp = gpar(fontsize = 6)),
+                       PCC = anno_text(corr$V1, gp = gpar(fontsize = 6)))
+
+col_dend = as.dendrogram(hc1)
+col_dend = color_branches(col_dend, k = 4) 
+#plot(col_dend,type="triangle",ylab='height')
+
+
+Heatmap(TP53_mat,cluster_columns=col_dend,
+        row_order=vec,
+        row_gap = unit(4, "mm"),
+        show_row_names = F,
+        show_column_names = F,
+        name = "CERES score",
+        row_title_gp = gpar(fontsize = 4, fontface = "bold"),
+        column_names_gp = grid::gpar(fontsize = 8),
+        right_annotation = row_ha,
+        column_title = "All Cancer Cell Lines",)
+```
+#Identify Lineages
+```{r}
+clusterdf<- data.frame(Cluster_ID= cutree(col_dend,k=4))
+clusterdf<- setDT(clusterdf, keep.rownames = TRUE)[]
+
+cluster1 <- filter(clusterdf, Cluster_ID == "1")
+cluster2 <- filter(clusterdf, Cluster_ID == "2")
+cluster3 <- filter(clusterdf, Cluster_ID == "3")
+cluster4 <- filter(clusterdf, Cluster_ID == "4")
+```
+
+```{r}
+#cluster4 <- rename(cluster4, DepMap_ID = rn)
+cluster4SI <- semi_join(sample_info, cluster4, by = "DepMap_ID")
+g <- ggplot(cluster4SI, aes(y = lineage))
+g + geom_bar()
+```
+# Cluster 4 - Subtypes
+```{r}
+g <- ggplot(cluster4SI, aes(y = Subtype))
+g + geom_bar()
+```
+
+
+
+#Cluster 2 - Lineages
+```{r}
+#cluster2 <- rename(cluster2, DepMap_ID = rn)
+cluster2SI <- semi_join(sample_info, cluster2, by = "DepMap_ID")
+g <- ggplot(cluster2SI, aes(y = lineage))
+g + geom_bar()
+```
+
+```{r}
+g <- ggplot(cluster2SI, aes(y = Subtype))
+g + geom_bar()
+```
+# Cluster 3 Identification
+```{r}
+cluster3 <- rename(cluster3, DepMap_ID = rn)
+cluster3SI <- semi_join(sample_info, cluster3, by = "DepMap_ID")
+```
+#Cluster 3 lineages
+```{r}
+g <- ggplot(cluster3SI, aes(y = lineage))
+g + geom_bar()
+```
+
+# Cluster 2 results show clear indication of Soft tissue
+# Furtherr Cluster 2 analysis
+
+```{r}
+# Most essential genes to TP53 - Negative Corr and Poss Corr
+
+CCLE <- read.csv('CCLE_Expression.csv')
+```
+
+```{r}
+CCLE_ST <- CCLE %>%
+  filter(CCLE$X %in% cluster2SI$DepMap_ID)
+```
+
+```{r}
+names(CCLE_ST) <- gsub("[[:punct:]]", "_", names(CCLE_ST))
+names(CCLE_ST) <- sub('_.*', '', names(CCLE_ST))
+```
+
+```{r}
+CCLE_TP53 <- as.data.frame(cor(CCLE_ST[,2:ncol(CCLE_ST)],CCLE_ST[['TP53']]))
+CCLE_TP53 <- rownames_to_column(CCLE_TP53,var='Gene')
+```
+
+```{r}
+corrs <- CCLE_TP53[order(-abs(CCLE_TP53$V1)),]
+#corr <- rbind.data.frame(c("USP7",1), corr)
+corrs$target <- 'TP53'
+corrs <- corrs[,c(1,3,2)]
+corrs$V1 <- as.numeric(corrs$V1)
+corrs$V1 <- format(round(corrs$V1, 2), nsmall = 3)
+```
+
+```{r}
+corrs <- corrs[! (corrs$Gene == 'KRTAP19.6'),]
+corrs <- corrs[1:40,]
+corrs <- na.omit(corrs)
+vecs <- as.vector(corrs$Gene)
+CCLE_TP53_mat <- CCLE_ST[,which((names(CCLE_ST) %in% vec)==TRUE)]
+
+rownames(CCLE_TP53_mat) <- CCLE_ST$X
+CCLE_TP53_mat <- as.matrix(CCLE_TP53_mat)
+CCLE_TP53_mat <- t(CCLE_TP53_mat)
+```
+
+```{r}
+ds <- dist(t(CCLE_TP53_mat), method = "euclidean")
+hc2 <- hclust(ds, method = "complete" )
+
+plot(hc2, cex = 0.6, hang = -1)
+rect.hclust(hc2, k = 4, border = 2:5)
+```
+
+```{r}
+row_ha = rowAnnotation(genes = anno_text(corr$Gene, gp = gpar(fontsize = 6)),
+                       PCC = anno_text(corr$V1, gp = gpar(fontsize = 6)))
+
+col_dends = as.dendrogram(hc2)
+col_dends = color_branches(col_dends, k = 4) 
+#plot(col_dend,type="triangle",ylab='height')
+
+
+Heatmap(CCLE_TP53_mat,cluster_columns=col_dends,
+        row_order=vec,
+        row_gap = unit(4, "mm"),
+        show_row_names = F,
+        show_column_names = T,
+        name = "Expression",
+        row_title_gp = gpar(fontsize = 4, fontface = "bold"),
+        column_names_gp = grid::gpar(fontsize = 8),
+        right_annotation = row_ha,
+        column_title = "Cluster 2 Cell Lines",)
+```
+```{r}
+clusterdfs<- data.frame(Cluster_ID= cutree(col_dends,k=4))
+clusterdfs<- setDT(clusterdfs, keep.rownames = TRUE)[]
+
+cluster1s <- filter(clusterdfs, Cluster_ID == "1")
+cluster2s <- filter(clusterdfs, Cluster_ID == "2")
+cluster3s <- filter(clusterdfs, Cluster_ID == "3")
+cluster4s <- filter(clusterdfs, Cluster_ID == "4")
+```
+# Cluster 2 has high expression of TP53
+```{r}
+cluster2s <- rename(cluster2s, DepMap_ID = rn)
+cluster2se <- semi_join(sample_info, cluster2s, by = "DepMap_ID")
+```
+
+```{r}
+g <- ggplot(cluster2se, aes(y = lineage))
+g + geom_bar()
+```
+
+```{r}
+g <- ggplot(cluster2se, aes(y = Subtype))
+g + geom_bar()
+```
+#Cluster 3 has low TP53 expression
+```{r}
+cluster3s <- rename(cluster3s, DepMap_ID = rn)
+cluster3se <- semi_join(sample_info, cluster3s, by = "DepMap_ID")
+```
+
+```{r}
+g <- ggplot(cluster3se, aes(y = lineage))
+g + geom_bar()
+```
+```{r}
+g <- ggplot(cluster3se, aes(y = Subtype))
+g + geom_bar()
+```
+
+
+
+#Cluster 3 (Essentality) Further analysis
+```{r}
+CCLE <- read.csv('CCLE_Expression.csv')
+```
+
+```{r}
+CCLE_C3 <- CCLE %>%
+  filter(CCLE$X %in% cluster3SI$DepMap_ID)
+```
+
+```{r}
+names(CCLE_C3) <- gsub("[[:punct:]]", "_", names(CCLE_C3))
+names(CCLE_C3) <- sub('_.*', '', names(CCLE_C3))
+```
+
+```{r}
+CCLE_TP53_c3 <- CCLE_C3[,which((names(CCLE_C3) %in% vec)==TRUE)]
+
+rownames(CCLE_TP53_c3) <- CCLE_C3$X
+CCLE_TP53_c3 <- as.matrix(CCLE_TP53_c3)
+CCLE_TP53_c3 <- t(CCLE_TP53_c3)
+```
+
+```{r}
+dsc3 <- dist(t(CCLE_TP53_c3), method = "euclidean")
+hc3 <- hclust(dsc3, method = "complete" )
+
+plot(hc3, cex = 0.6, hang = -1)
+rect.hclust(hc3, k = 4, border = 2:5)
+```
+
+```{r}
+row_ha = rowAnnotation(genes = anno_text(corr$Gene, gp = gpar(fontsize = 6)),
+                       PCC = anno_text(corr$V1, gp = gpar(fontsize = 6)))
+
+col_dends_c3 = as.dendrogram(hc3)
+col_dends_c3 = color_branches(col_dends_c3, k = 4) 
+#plot(col_dend,type="triangle",ylab='height')
+
+
+Heatmap(CCLE_TP53_c3,cluster_columns=col_dends_c3,
+        row_order=vec,
+        row_gap = unit(4, "mm"),
+        show_row_names = F,
+        show_column_names = F,
+        name = "Expression",
+        row_title_gp = gpar(fontsize = 4, fontface = "bold"),
+        column_names_gp = grid::gpar(fontsize = 8),
+        right_annotation = row_ha,
+        column_title = "Cluster 3 Cell Lines",)
+```
+```
+
